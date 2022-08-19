@@ -9,25 +9,17 @@ void knot_storage_init(KnotStorage *storage, int maxnum) {
     assert(storage);
     assert(maxnum > 3);
 
+    memset(storage, 0, sizeof(*storage));
+
+    storage->last_id = 0;
     storage->knots = calloc(maxnum, sizeof(storage->knots[0]));
     storage->knotsnum_max = maxnum;
     storage->knotsnum = 0;
-
-    /*Knot *current = &storage->knots[0];*/
-    /*current->prev_free = NULL;*/
-    /*current->next_free = NULL;*/
+    storage->free_num = maxnum;
 
     for(int i = 0; i < maxnum - 1; ++i) {
         storage->knots[i].next_free = &storage->knots[i + 1];
-
-        /*current->next_free = &st->tanks[i];*/
-        /*current->prev_free = prev_free;*/
-        /*prev_free = current;*/
-        /*current = current->next;*/
-        /*printf("i %d\n", i);*/
-
     }
-
     for(int i = 1; i < maxnum; ++i) {
         storage->knots[i].prev_free = &storage->knots[i - 1];
     }
@@ -36,6 +28,7 @@ void knot_storage_init(KnotStorage *storage, int maxnum) {
     storage->knots[maxnum - 1].next_free = NULL;
 
     storage->knots_free = &storage->knots[0];
+    /*printf("storage->knots_free %p\n", storage->knots_free);*/
     storage->knots_allocated = NULL;
 }
 
@@ -50,10 +43,20 @@ Knot *knot_alloc(KnotStorage *storage) {
     if (storage->knotsnum == storage->knotsnum_max) {
         return NULL;
     }
+
+    storage->free_num--;
+    storage->allocated_num++;
+
+    /*printf("storage->knots_free %p\n", storage->knots_free);*/
+
     assert(storage->knots_free);
     Knot *new = storage->knots_free;
-    new->next_free = NULL;
-    new->prev_free = NULL;
+
+    /*printf("storage->knots_free %p\n", storage->knots_free);*/
+    /*printf("storage->knots_free->next_free %p\n", */
+            /*storage->knots_free->next_free*/
+    /*);*/
+
     storage->knots_free = storage->knots_free->next_free;
 
     if (storage->knots_free)
@@ -70,12 +73,109 @@ Knot *knot_alloc(KnotStorage *storage) {
         storage->knots_allocated = new;
     }
 
+    new->is_free = false;
+    new->is_allocated = true;
+
+    new->next_free = NULL;
+    new->prev_free = NULL;
+
+    new->id = storage->last_id++;
+
     return new;
 }
 
 void knot_free(KnotStorage *storage, Knot *knot) {
+    assert(storage);
+    assert(knot);
+
+    /*knot->id = -1;*/
+    storage->free_num++;
+    storage->allocated_num--;
+
+    printf(
+            "allocated_num %d free_num %d\n",
+            storage->allocated_num,
+            storage->free_num
+    );
+
+    /*printf("knot                        %p\n", knot);*/
+    /*printf("storage->knots_allocated    %p\n", storage->knots_allocated);*/
+
+    if (knot != storage->knots_allocated) {
+        Knot *prev = knot->prev_allocated;
+        Knot *next = knot->next_allocated;
+
+        if (next) {
+            next->prev_allocated = prev;
+        }
+        if (prev) {
+            prev->next_allocated = next;
+        }
+
+    } else {
+        /*printf("rare case\n");*/
+        if (storage->knots_allocated->next_allocated) {
+            storage->knots_allocated = storage->knots_allocated->next_allocated;
+            storage->knots_allocated->prev_allocated = NULL;
+        } else {
+            storage->knots_allocated = NULL;
+        }
+    }
+
+    knot->next_allocated = NULL;
+    knot->prev_allocated = NULL;
+    knot->is_free = true;
+    knot->is_allocated = false;
+
+    Knot *new = knot;
+    if (!storage->knots_free) {
+        storage->knots_free = new;
+        new->next_free = NULL;
+        new->prev_free = NULL;
+    } else {
+        new->prev_free = NULL;
+        storage->knots_free->prev_free = new;
+        new->next_free = storage->knots_free;
+        storage->knots_free = new;
+    }
+
 }
 
-void knot_foreach(KnotStorage *storage, KnotIterFunc func) {
+bool knot_foreach_allocated(
+    KnotStorage *storage,
+    KnotIterFunc func,
+    void *data
+) {
+    assert(storage);
+    assert(func);
+
+    Knot *cur = storage->knots_allocated;
+    while (cur) {
+        if (func(cur, data)) {
+            return true;
+        }
+        cur = cur->next_allocated;
+    }
+
+    return false;
+}
+
+bool knot_foreach_free(
+    KnotStorage *storage,
+    KnotIterFunc func,
+    void *data
+) {
+    assert(storage);
+    assert(func);
+
+    Knot *cur = storage->knots_free;
+    while (cur) {
+        if (func(cur, data)) {
+            return true;
+        }
+        cur = cur->next_free;
+    }
+
+    return false;
 }
 

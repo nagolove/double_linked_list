@@ -1,5 +1,7 @@
 #include "munit.h"
 #include "dlist.h"
+#include <assert.h>
+#include <string.h>
 
 static MunitResult
 test_init(const MunitParameter params[], void* data) {
@@ -73,6 +75,8 @@ test_alloc(const MunitParameter params[], void* data) {
   munit_assert(st.knots[3].next_allocated == NULL);
   munit_assert(st.knots[3].prev_allocated == NULL);
 
+  munit_assert(st.knots_free == &st.knots[0]);
+  munit_assert(st.knots_free->next_free != NULL);
   munit_assert(st.knots[0].next_free == &st.knots[1]);
   munit_assert(st.knots[1].next_free == &st.knots[2]);
   munit_assert(st.knots[2].next_free == &st.knots[3]);
@@ -88,15 +92,218 @@ test_alloc(const MunitParameter params[], void* data) {
   Knot *kn1 = knot_alloc(&st);
   munit_assert(kn1 != NULL);
   printf("kn1\n");
+
   Knot *kn2 = knot_alloc(&st);
   munit_assert(kn2 != NULL);
   printf("kn2\n");
 
+  Knot *kn3 = knot_alloc(&st);
+  munit_assert(kn3 != NULL);
+  printf("kn3\n");
+
+  Knot *kn4 = knot_alloc(&st);
+  munit_assert(kn4 != NULL);
+  printf("kn4\n");
+
   munit_assert(kn1 != kn2);
+  munit_assert(kn2 != kn3);
+  munit_assert(kn3 != kn4);
+  munit_assert(kn4 != kn1);
+
   munit_assert(st.knots_allocated != NULL);
   munit_assert(st.knots_allocated->prev_allocated == NULL);
 
   knot_storage_free(&st);
+
+  return MUNIT_OK;
+}
+
+bool iter_check_id(Knot *kn, void *data) {
+    return kn->id == (int)data;
+}
+
+bool iter_test(Knot *kn, void *data) {
+    assert(kn);
+    printf("kn->id = %d\n", kn->id);
+    return false;
+}
+
+static MunitResult
+test_alloc_free(const MunitParameter params[], void* data) {
+  (void) params;
+
+  KnotStorage st;
+  int maxnum = 4;
+  knot_storage_init(&st, maxnum);
+
+  munit_assert(st.knots[0].next_allocated == NULL);
+  munit_assert(st.knots[0].prev_allocated == NULL);
+
+  munit_assert(st.knots[1].next_allocated == NULL);
+  munit_assert(st.knots[1].prev_allocated == NULL);
+
+  munit_assert(st.knots[2].next_allocated == NULL);
+  munit_assert(st.knots[2].prev_allocated == NULL);
+
+  munit_assert(st.knots[3].next_allocated == NULL);
+  munit_assert(st.knots[3].prev_allocated == NULL);
+
+  munit_assert(st.knots_free == &st.knots[0]);
+  munit_assert(st.knots_free->next_free != NULL);
+  munit_assert(st.knots[0].next_free == &st.knots[1]);
+  munit_assert(st.knots[1].next_free == &st.knots[2]);
+  munit_assert(st.knots[2].next_free == &st.knots[3]);
+  munit_assert(st.knots[3].next_free == NULL);
+
+  munit_assert(st.knots[0].prev_free == NULL);
+  munit_assert(st.knots[1].prev_free == &st.knots[0]);
+  munit_assert(st.knots[2].prev_free == &st.knots[1]);
+  munit_assert(st.knots[3].prev_free == &st.knots[2]);
+
+  munit_assert(st.knots_free != NULL);
+
+  printf("\n");
+
+  Knot *kn1 = knot_alloc(&st);
+  printf("id %d\n", kn1->id);
+  Knot *kn2 = knot_alloc(&st);
+  printf("id %d\n", kn2->id);
+  Knot *kn3 = knot_alloc(&st);
+  printf("id %d\n", kn3->id);
+
+  printf("allocated nodes\n");
+  knot_foreach_allocated(&st, iter_test, NULL);
+  /*printf("---------------------------------------\n");*/
+  printf("free nodes\n");
+  knot_foreach_free(&st, iter_test, NULL);
+  printf("---------------------------------------\n");
+
+  knot_free(&st, kn1);
+  knot_free(&st, kn2);
+  knot_free(&st, kn3);
+
+  printf("allocated nodes\n");
+  knot_foreach_allocated(&st, iter_test, NULL);
+  /*printf("---------------------------------------\n");*/
+  printf("free nodes\n");
+  knot_foreach_free(&st, iter_test, NULL);
+  printf("---------------------------------------\n");
+
+  return MUNIT_OK;
+}
+
+static MunitResult
+test_alloc_free_alloc(const MunitParameter params[], void* data) {
+  (void) params;
+
+  KnotStorage st;
+  int maxnum = 4;
+  knot_storage_init(&st, maxnum);
+
+  printf("\n");
+
+  Knot *kn1, *kn2, *kn3, *kn4;
+
+  kn1 = knot_alloc(&st);
+  munit_assert_int(kn1->id, ==, 0);
+  kn2 = knot_alloc(&st);
+  munit_assert_int(kn2->id, ==, 1);
+  kn3 = knot_alloc(&st);
+  munit_assert_int(kn3->id, ==, 2);
+  kn4 = knot_alloc(&st);
+  munit_assert_int(kn4->id, ==, 3);
+
+  printf("allocated nodes\n");
+  knot_foreach_allocated(&st, iter_test, NULL);
+  /*printf("---------------------------------------\n");*/
+  printf("free nodes\n");
+  knot_foreach_free(&st, iter_test, NULL);
+  printf("---------------------------------------\n");
+
+  knot_free(&st, kn1);
+  knot_free(&st, kn2);
+  knot_free(&st, kn3);
+  knot_free(&st, kn4);
+
+  printf("allocated nodes\n");
+  knot_foreach_allocated(&st, iter_test, NULL);
+  printf("free nodes\n");
+  knot_foreach_free(&st, iter_test, NULL);
+  printf("---------------------------------------\n");
+  
+  kn1 = knot_alloc(&st);
+  munit_assert_int(kn1->id, ==, 4);
+  kn2 = knot_alloc(&st);
+  munit_assert_int(kn2->id, ==, 5);
+  kn3 = knot_alloc(&st);
+  munit_assert_int(kn3->id, ==, 6);
+  kn4 = knot_alloc(&st);
+  munit_assert_int(kn4->id, ==, 7);
+
+  printf("allocated nodes\n");
+  knot_foreach_allocated(&st, iter_test, NULL);
+  /*printf("---------------------------------------\n");*/
+  printf("free nodes\n");
+  knot_foreach_free(&st, iter_test, NULL);
+  printf("---------------------------------------\n");
+
+  return MUNIT_OK;
+}
+
+static MunitResult
+test_alloc_free_alloc2(const MunitParameter params[], void* data) {
+  (void) params;
+
+  KnotStorage st;
+  int maxnum = 4;
+  knot_storage_init(&st, maxnum);
+
+  printf("\n");
+
+  Knot *kn1, *kn2, *kn3, *kn4;
+  int saved_id = -1;
+
+  kn1 = knot_alloc(&st);
+  munit_assert_int(kn1->id, ==, 0);
+  kn2 = knot_alloc(&st);
+  munit_assert_int(kn2->id, ==, 1);
+  kn3 = knot_alloc(&st);
+  munit_assert_int(kn3->id, ==, 2);
+  kn4 = knot_alloc(&st);
+  munit_assert_int(kn4->id, ==, 3);
+
+  knot_free(&st, kn1);
+  knot_free(&st, kn2);
+  saved_id = kn3->id;
+  knot_free(&st, kn3);
+  knot_free(&st, kn4);
+
+  munit_assert_false(knot_foreach_allocated(&st, iter_check_id, saved_id));
+  munit_assert_true(knot_foreach_free(&st, iter_check_id, saved_id));
+
+  kn1 = knot_alloc(&st);
+  munit_assert_int(kn1->id, ==, 4);
+  kn2 = knot_alloc(&st);
+  munit_assert_int(kn2->id, ==, 5);
+  kn3 = knot_alloc(&st);
+  munit_assert_int(kn3->id, ==, 6);
+  kn4 = knot_alloc(&st);
+  munit_assert_int(kn4->id, ==, 7);
+
+  saved_id = kn2->id;
+  knot_free(&st, kn2);
+  knot_free(&st, kn1);
+  knot_free(&st, kn3);
+
+  munit_assert_false(knot_foreach_allocated(&st, iter_check_id, saved_id));
+  munit_assert_true(knot_foreach_free(&st, iter_check_id, saved_id));
+
+  printf("allocated nodes\n");
+  knot_foreach_allocated(&st, iter_test, NULL);
+  /*printf("---------------------------------------\n");*/
+  printf("free nodes\n");
+  knot_foreach_free(&st, iter_test, NULL);
+  printf("---------------------------------------\n");
 
   return MUNIT_OK;
 }
@@ -346,6 +553,9 @@ static MunitParameterEnum test_params[] = {
 static MunitTest dlist_tests[] = {
   { (char*) "/dlist/init", test_init, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
   { (char*) "/dlist/alloc", test_alloc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
+  { (char*) "/dlist/alloc_free", test_alloc_free, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
+  { (char*) "/dlist/alloc_free_alloc", test_alloc_free_alloc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
+  { (char*) "/dlist/alloc_free_alloc2", test_alloc_free_alloc2, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
 
   /*{ (char*) "/CIRC_BUF/push", test_push, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },*/
   /*{ (char*) "/CIRC_BUF/pop", test_pop, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },*/
