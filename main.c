@@ -6,12 +6,34 @@ test_init(const MunitParameter params[], void* data) {
   (void) params;
 
   KnotStorage st;
-  int maxnum = 10;
+  int maxnum = 4;
   knot_storage_init(&st, maxnum);
 
+  munit_assert(st.knots[0].next_allocated == NULL);
+  munit_assert(st.knots[0].prev_allocated == NULL);
+
+  munit_assert(st.knots[1].next_allocated == NULL);
+  munit_assert(st.knots[1].prev_allocated == NULL);
+
+  munit_assert(st.knots[2].next_allocated == NULL);
+  munit_assert(st.knots[2].prev_allocated == NULL);
+
+  munit_assert(st.knots[3].next_allocated == NULL);
+  munit_assert(st.knots[3].prev_allocated == NULL);
+
+  munit_assert(st.knots[0].next_free == &st.knots[1]);
+  munit_assert(st.knots[1].next_free == &st.knots[2]);
+  munit_assert(st.knots[2].next_free == &st.knots[3]);
+  munit_assert(st.knots[3].next_free == NULL);
+
+  munit_assert(st.knots[0].prev_free == NULL);
+  munit_assert(st.knots[1].prev_free == &st.knots[0]);
+  munit_assert(st.knots[2].prev_free == &st.knots[1]);
+  munit_assert(st.knots[3].prev_free == &st.knots[2]);
+
   printf("allocated         %p\n", st.knots_allocated);
-  printf("allocated->next   %p\n", st.knots_allocated->next_allocated);
-  printf("allocated->prev   %p\n", st.knots_allocated->prev_allocated);
+  /*printf("allocated->next   %p\n", st.knots_allocated->next_allocated);*/
+  /*printf("allocated->prev   %p\n", st.knots_allocated->prev_allocated);*/
   printf("free              %p\n", st.knots_free);
   printf("free->next        %p\n", st.knots_free->next_free);
   printf("free->prev        %p\n", st.knots_free->prev_free);
@@ -25,6 +47,54 @@ test_init(const MunitParameter params[], void* data) {
       printf("next_free         %p\n", kn->next_free);
       printf("prev_free         %p\n", kn->prev_free);
   }
+
+  knot_storage_free(&st);
+
+  return MUNIT_OK;
+}
+
+static MunitResult
+test_alloc(const MunitParameter params[], void* data) {
+  (void) params;
+
+  KnotStorage st;
+  int maxnum = 4;
+  knot_storage_init(&st, maxnum);
+
+  munit_assert(st.knots[0].next_allocated == NULL);
+  munit_assert(st.knots[0].prev_allocated == NULL);
+
+  munit_assert(st.knots[1].next_allocated == NULL);
+  munit_assert(st.knots[1].prev_allocated == NULL);
+
+  munit_assert(st.knots[2].next_allocated == NULL);
+  munit_assert(st.knots[2].prev_allocated == NULL);
+
+  munit_assert(st.knots[3].next_allocated == NULL);
+  munit_assert(st.knots[3].prev_allocated == NULL);
+
+  munit_assert(st.knots[0].next_free == &st.knots[1]);
+  munit_assert(st.knots[1].next_free == &st.knots[2]);
+  munit_assert(st.knots[2].next_free == &st.knots[3]);
+  munit_assert(st.knots[3].next_free == NULL);
+
+  munit_assert(st.knots[0].prev_free == NULL);
+  munit_assert(st.knots[1].prev_free == &st.knots[0]);
+  munit_assert(st.knots[2].prev_free == &st.knots[1]);
+  munit_assert(st.knots[3].prev_free == &st.knots[2]);
+
+  munit_assert(st.knots_free != NULL);
+
+  Knot *kn1 = knot_alloc(&st);
+  munit_assert(kn1 != NULL);
+  printf("kn1\n");
+  Knot *kn2 = knot_alloc(&st);
+  munit_assert(kn2 != NULL);
+  printf("kn2\n");
+
+  munit_assert(kn1 != kn2);
+  munit_assert(st.knots_allocated != NULL);
+  munit_assert(st.knots_allocated->prev_allocated == NULL);
 
   knot_storage_free(&st);
 
@@ -273,8 +343,9 @@ static MunitParameterEnum test_params[] = {
   { NULL, NULL },
 };
 
-static MunitTest CIRC_BUF_tests[] = {
+static MunitTest dlist_tests[] = {
   { (char*) "/dlist/init", test_init, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
+  { (char*) "/dlist/alloc", test_alloc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
 
   /*{ (char*) "/CIRC_BUF/push", test_push, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },*/
   /*{ (char*) "/CIRC_BUF/pop", test_pop, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },*/
@@ -306,7 +377,7 @@ static const MunitSuite test_suite = {
   (char*) "",
   /* The first parameter is the array of test suites. */
   /*test_suite_tests,*/
-  CIRC_BUF_tests,
+  dlist_tests,
   /* In addition to containing test cases, suites can contain other
    * test suites.  This isn't necessary in this example, but it can be
    * a great help to projects with lots of tests by making it easier
